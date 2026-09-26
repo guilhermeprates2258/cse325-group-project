@@ -5,20 +5,12 @@ A .NET Blazor web application built for CSE 325 at Brigham Young University-Idah
 ## Team Members
 
 - Guilherme Prates Batista
-- TEAM MEMBER 2
-- TEAM MEMBER 3
-- TEAM MEMBER 4
 
 ## Project Summary
 
-The group is evaluating four candidate applications and will select one at the W03 meeting. Whichever is chosen, the application will be a Blazor Web App with user authentication and full CRUD functionality, deployed to a cloud service.
+**CourtTime** is a booking system for small sports facilities (beach tennis, padel, futsal). Players see real-time court availability and reserve a time slot themselves; facility managers register courts and prices, block slots for classes or maintenance, and track the daily schedule and payments in one place.
 
-Candidates under consideration:
-
-1. CourtTime - a booking system for small sports facilities (beach tennis, padel, futsal).
-2. MentorLink - a peer mentoring session scheduler for online learning programs.
-3. ServeHours - a volunteer opportunity and service hours tracker for small nonprofits.
-4. JobDesk - a job and invoice tracker for one-to-five person service businesses.
+The project was selected at the W03 meeting. The full proposal (overview, scope, features, user stories, and technical considerations) is in [PROPOSAL.md](PROPOSAL.md).
 
 ## Technology Stack
 
@@ -44,7 +36,7 @@ The application runs at https://localhost:5001 by default.
 
 ## Project Management
 
-Tasks are tracked on our Trello board. The board URL is listed in the course submission document.
+Features and tasks are tracked on our public Trello board: https://trello.com/b/xDjtmoAJ/cse-325-group-project
 
 ## Course Requirements
 
