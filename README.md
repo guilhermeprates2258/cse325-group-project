@@ -14,19 +14,32 @@ The project was selected at the W03 meeting. The full proposal (overview, scope,
 
 ## Technology Stack
 
-- .NET 9 / Blazor Web App (interactive server rendering)
+- .NET 10 (LTS) / Blazor Web App (interactive server rendering)
 - Entity Framework Core with SQL Server
 - ASP.NET Core Identity for user authentication
 - Deployed to Azure App Service
 
 ## Getting Started
 
+Requirements: .NET 10 SDK and SQL Server LocalDB (installed with Visual Studio) or another SQL Server instance.
+
     git clone https://github.com/guilhermeprates2258/cse325-group-project.git
-    cd cse325-group-project
+    cd cse325-group-project/src/CourtTime
+    dotnet tool install --global dotnet-ef   # once per machine
     dotnet restore
+    dotnet ef database update
     dotnet run
 
-The application runs at https://localhost:5001 by default.
+On startup the app applies pending migrations and creates the `Player` and `FacilityManager` roles.
+The connection string is in `src/CourtTime/appsettings.json` (`DefaultConnection`).
+
+## Project Structure
+
+    src/CourtTime/
+      Components/        Blazor pages, layout and Identity (Account) pages
+      Data/              ApplicationDbContext, ApplicationUser, Roles, DbInitializer, Migrations
+      Models/            Domain entities: Facility, Court, Booking, BlockedSlot
+    docs/ERD.md          Data model diagram and database rules
 
 ## Branching Model
 

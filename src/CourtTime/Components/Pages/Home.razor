@@ -1,0 +1,23 @@
+@page "/"
+
+<PageTitle>CourtTime</PageTitle>
+
+<section class="py-4">
+    <h1>CourtTime</h1>
+    <p class="lead">Book beach tennis, padel and futsal courts in a few clicks.</p>
+    <p>
+        Players see real-time court availability and reserve a slot themselves.
+        Facility managers keep one reliable schedule, block time for classes or maintenance,
+        and track who paid.
+    </p>
+
+    <AuthorizeView>
+        <Authorized>
+            <p>Welcome back, @context.User.Identity?.Name.</p>
+        </Authorized>
+        <NotAuthorized>
+            <a class="btn btn-primary me-2" href="Account/Register">Create an account</a>
+            <a class="btn btn-outline-primary" href="Account/Login">Log in</a>
+        </NotAuthorized>
+    </AuthorizeView>
+</section>
