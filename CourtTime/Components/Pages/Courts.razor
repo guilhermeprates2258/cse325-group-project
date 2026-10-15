@@ -1,0 +1,91 @@
+@page "/courts"
+@inject ApplicationDbContext Db
+
+<PageTitle>Courts - CourtTime</PageTitle>
+
+<h1>Courts</h1>
+<p class="text-body-secondary">Pick a court to see today's free time slots.</p>
+
+@* Plain GET form: works without JavaScript and keeps the filter in the URL. *@
+<form method="get" class="row g-2 align-items-end mb-4">
+    <div class="col-auto">
+        <label for="sport" class="form-label">Sport</label>
+        <select id="sport" name="sport" class="form-select">
+            <option value="">All sports</option>
+            @foreach (var sport in Enum.GetValues<SportType>())
+            {
+                <option value="@sport" selected="@(selectedSport == sport)">@Formatting.Sport(sport)</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-brand">Filter</button>
+    </div>
+</form>
+
+@if (courts is null)
+{
+    <p>Loading courts...</p>
+}
+else if (courts.Count == 0)
+{
+    <p>No courts found for this sport.</p>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var court in courts)
+        {
+            <div class="col-sm-6 col-lg-4">
+                <article class="card h-100 court-card">
+                    <div class="card-body">
+                        <span class="badge sport-badge mb-2">@Formatting.Sport(court.Sport)</span>
+                        <h2 class="h5 card-title">@court.Name</h2>
+                        <p class="card-subtitle mb-2 text-body-secondary">@court.Facility?.Name</p>
+                        <dl class="row mb-0 small">
+                            <dt class="col-5">Surface</dt>
+                            <dd class="col-7">@Formatting.Surface(court.Surface)</dd>
+                            <dt class="col-5">Price</dt>
+                            <dd class="col-7">@Formatting.Price(court.HourlyPrice) / hour</dd>
+                            <dt class="col-5">Hours</dt>
+                            <dd class="col-7">@court.OpensAt.ToString("HH:mm") - @court.ClosesAt.ToString("HH:mm")</dd>
+                        </dl>
+                    </div>
+                    <div class="card-footer bg-transparent border-0 pt-0">
+                        <a class="btn btn-outline-brand w-100" href="courts/@court.Id">
+                            See availability<span class="visually-hidden">@($" for {court.Name}")</span>
+                        </a>
+                    </div>
+                </article>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "sport")]
+    private string? Sport { get; set; }
+
+    private SportType? selectedSport;
+    private List<Court>? courts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        selectedSport = Enum.TryParse<SportType>(Sport, ignoreCase: true, out var parsed) ? parsed : null;
+
+        var query = Db.Courts
+            .AsNoTracking()
+            .Include(c => c.Facility)
+            .Where(c => c.IsActive);
+
+        if (selectedSport is not null)
+        {
+            query = query.Where(c => c.Sport == selectedSport);
+        }
+
+        courts = await query
+            .OrderBy(c => c.Facility!.Name)
+            .ThenBy(c => c.Name)
+            .ToListAsync();
+    }
+}

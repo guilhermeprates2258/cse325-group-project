@@ -1,0 +1,13 @@
+@* Shows the result of a form action. Messages starting with "Error" are shown as errors. *@
+@if (!string.IsNullOrEmpty(Message))
+{
+    var isError = Message.StartsWith("Error", StringComparison.OrdinalIgnoreCase);
+    <div class="alert @(isError ? "alert-danger" : "alert-success")" role="@(isError ? "alert" : "status")">
+        @Message
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string? Message { get; set; }
+}

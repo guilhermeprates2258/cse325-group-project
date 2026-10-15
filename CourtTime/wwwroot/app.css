@@ -1,0 +1,219 @@
+/* CourtTime brand. Colors were chosen for WCAG 2.1 AA contrast (4.5:1 or better for text). */
+:root {
+    --brand: #0b3d5c;
+    --brand-hover: #082c43;
+    --accent: #f2a541;
+    --accent-hover: #e08f22;
+    --free: #e6f4ea;
+    --free-border: #1e7b3a;
+    --booked: #f1f3f5;
+    --blocked: #fff4e0;
+    --mine: #dbeafe;
+    --bs-link-color: #0b5583;
+    --bs-link-color-rgb: 11, 85, 131;
+    --bs-link-hover-color: #082c43;
+    --bs-link-hover-color-rgb: 8, 44, 67;
+}
+
+.btn-link {
+    --bs-btn-color: #0b5583;
+    --bs-btn-hover-color: #082c43;
+}
+
+body {
+    background-color: #fbfcfd;
+}
+
+.bg-brand {
+    background-color: var(--brand);
+}
+
+.brand-dot {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 0.25rem;
+}
+
+.btn-brand {
+    background-color: var(--brand);
+    border-color: var(--brand);
+    color: #fff;
+}
+
+.btn-brand:hover,
+.btn-brand:focus-visible {
+    background-color: var(--brand-hover);
+    border-color: var(--brand-hover);
+    color: #fff;
+}
+
+.btn-outline-brand {
+    border-color: var(--brand);
+    color: var(--brand);
+}
+
+.btn-outline-brand:hover,
+.btn-outline-brand:focus-visible {
+    background-color: var(--brand);
+    color: #fff;
+}
+
+.btn-accent {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: #1d1d1d;
+    font-weight: 600;
+}
+
+.btn-accent:hover,
+.btn-accent:focus-visible {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: #1d1d1d;
+}
+
+.navbar .nav-link.active {
+    color: #fff;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-decoration-thickness: 3px;
+    text-underline-offset: 6px;
+}
+
+.hero {
+    background: linear-gradient(135deg, var(--brand), #145a85);
+    color: #fff;
+}
+
+.sport-badge {
+    background-color: var(--accent);
+    color: #1d1d1d;
+}
+
+.court-card {
+    border-top: 4px solid var(--brand);
+}
+
+/* Daily availability grid */
+.slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: 0.5rem;
+}
+
+.slot {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid #ced4da;
+    text-align: left;
+    min-height: 3.5rem;
+}
+
+.slot .time {
+    font-weight: 600;
+}
+
+.slot .state {
+    font-size: 0.85rem;
+}
+
+.slot.free {
+    background: var(--free);
+    border-color: var(--free-border);
+    color: #14532d;
+    cursor: pointer;
+}
+
+.slot.free:hover,
+.slot.free:focus-visible {
+    background: #c9ead3;
+}
+
+.slot.booked,
+.slot.past {
+    background: var(--booked);
+    color: #495057;
+}
+
+.slot.past {
+    opacity: 0.75;
+}
+
+.slot.blocked {
+    background: var(--blocked);
+    border-color: #b45309;
+    color: #7c2d12;
+}
+
+.slot.mine {
+    background: var(--mine);
+    border-color: #1d4ed8;
+    color: #1e3a8a;
+}
+
+.slot-key {
+    display: inline-block;
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 0.2rem;
+    border: 1px solid #adb5bd;
+    vertical-align: -0.1rem;
+}
+
+.slot-key.free { background: var(--free); border-color: var(--free-border); }
+.slot-key.booked { background: var(--booked); }
+.slot-key.blocked { background: var(--blocked); border-color: #b45309; }
+.slot-key.mine { background: var(--mine); border-color: #1d4ed8; }
+
+/* Manager day summary */
+.stat {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    background: #fff;
+    border: 1px solid #dee2e6;
+}
+
+.stat .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--brand);
+}
+
+.stat .label {
+    font-size: 0.85rem;
+    color: #495057;
+}
+
+h1:focus {
+    outline: none;
+}
+
+:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.validation-message {
+    color: #b02a37;
+}
+
+/* Keeps visually hidden table captions inside the scroll container on small screens. */
+.table-responsive {
+    position: relative;
+}
+
+/* Darker red so outline danger buttons meet 4.5:1 contrast. */
+.btn-outline-danger {
+    --bs-btn-color: #b02a37;
+    --bs-btn-border-color: #b02a37;
+    --bs-btn-hover-bg: #b02a37;
+    --bs-btn-hover-border-color: #b02a37;
+}

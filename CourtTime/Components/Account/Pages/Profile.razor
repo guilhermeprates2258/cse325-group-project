@@ -1,0 +1,97 @@
+@page "/Account/Profile"
+@attribute [Authorize]
+@inject UserManager<ApplicationUser> UserManager
+
+<PageTitle>My profile - CourtTime</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <h1>My profile</h1>
+        <StatusAlert Message="@statusMessage" />
+
+        @if (user is not null)
+        {
+            <p class="text-body-secondary">Signed in as <strong>@user.Email</strong></p>
+
+            <EditForm Model="Input" method="post" OnValidSubmit="SaveProfile" FormName="profile">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" role="alert" />
+
+                <div class="mb-3">
+                    <label for="fullname" class="form-label">Full name</label>
+                    <InputText id="fullname" @bind-Value="Input.FullName" class="form-control" autocomplete="name" />
+                    <ValidationMessage For="() => Input.FullName" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="phone" class="form-label">Phone</label>
+                    <InputText id="phone" type="tel" @bind-Value="Input.Phone" class="form-control" autocomplete="tel" />
+                    <ValidationMessage For="() => Input.Phone" class="text-danger" />
+                </div>
+                <div class="mb-3">
+                    <label for="sport" class="form-label">Preferred sport</label>
+                    <InputSelect id="sport" @bind-Value="Input.PreferredSport" class="form-select">
+                        <option value="">No preference</option>
+                        @foreach (var sport in Enum.GetValues<SportType>())
+                        {
+                            <option value="@sport">@Formatting.Sport(sport)</option>
+                        }
+                    </InputSelect>
+                </div>
+                <button type="submit" class="btn btn-brand">Save profile</button>
+            </EditForm>
+        }
+    </div>
+</div>
+
+@code {
+    private ApplicationUser? user;
+    private string? statusMessage;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private ProfileModel Input { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await UserManager.GetUserAsync((await AuthState).User);
+
+        // On GET, fill the form from the database; on POST, keep what the user typed.
+        Input ??= new ProfileModel
+        {
+            FullName = user?.FullName ?? "",
+            Phone = user?.PhoneNumber,
+            PreferredSport = user?.PreferredSport
+        };
+    }
+
+    private async Task SaveProfile()
+    {
+        if (user is null)
+        {
+            return;
+        }
+
+        user.FullName = Input.FullName.Trim();
+        user.PhoneNumber = string.IsNullOrWhiteSpace(Input.Phone) ? null : Input.Phone.Trim();
+        user.PreferredSport = Input.PreferredSport;
+
+        var result = await UserManager.UpdateAsync(user);
+        statusMessage = result.Succeeded
+            ? "Your profile was saved."
+            : "Error: " + string.Join(" ", result.Errors.Select(e => e.Description));
+    }
+
+    private sealed class ProfileModel
+    {
+        [Required, StringLength(100)]
+        [Display(Name = "Full name")]
+        public string FullName { get; set; } = "";
+
+        [RegularExpression(@"^[0-9+()\-\s]{7,30}$", ErrorMessage = "Enter a valid phone number.")]
+        public string? Phone { get; set; }
+
+        public SportType? PreferredSport { get; set; }
+    }
+}

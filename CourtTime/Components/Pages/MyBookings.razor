@@ -1,0 +1,131 @@
+@page "/bookings"
+@attribute [Authorize(Roles = Roles.Player)]
+@inject ApplicationDbContext Db
+@inject BookingService Bookings
+@inject UserManager<ApplicationUser> UserManager
+@inject IClock Clock
+
+<PageTitle>My bookings - CourtTime</PageTitle>
+
+<h1>My bookings</h1>
+<StatusAlert Message="@statusMessage" />
+
+<h2 class="h4 mt-4">Upcoming</h2>
+@if (upcoming.Count == 0)
+{
+    <p>You have no upcoming bookings. <a href="courts">Find a court</a>.</p>
+}
+else
+{
+    <form method="post" @formname="cancel" @onsubmit="CancelBooking">
+        <AntiforgeryToken />
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <caption class="visually-hidden">Upcoming bookings</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">When</th>
+                        <th scope="col">Court</th>
+                        <th scope="col">Price</th>
+                        <th scope="col">Payment</th>
+                        <th scope="col"><span class="visually-hidden">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var booking in upcoming)
+                    {
+                        <tr>
+                            <td>@Formatting.Day(booking.StartTime), @Formatting.Hour(booking.StartTime) - @Formatting.Hour(booking.EndTime)</td>
+                            <td>@booking.Court?.Name<br /><span class="small text-body-secondary">@booking.Court?.Facility?.Name</span></td>
+                            <td>@Formatting.Price(booking.Court?.HourlyPrice ?? 0)</td>
+                            <td>@(booking.PaymentStatus == PaymentStatus.Paid ? "Paid" : "Pay at the facility")</td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-outline-brand"
+                                   href="@($"courts/{booking.CourtId}?date={booking.StartTime:yyyy-MM-dd}&reschedule={booking.Id}")">Reschedule</a>
+                                <button type="submit" name="CancelId" value="@booking.Id" class="btn btn-sm btn-outline-danger">
+                                    Cancel<span class="visually-hidden">@($" booking on {Formatting.Day(booking.StartTime)} at {Formatting.Hour(booking.StartTime)}")</span>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </form>
+}
+
+<h2 class="h4 mt-4">History</h2>
+@if (history.Count == 0)
+{
+    <p>No past or cancelled bookings yet.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm">
+            <caption class="visually-hidden">Booking history</caption>
+            <thead>
+                <tr>
+                    <th scope="col">When</th>
+                    <th scope="col">Court</th>
+                    <th scope="col">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var booking in history)
+                {
+                    <tr>
+                        <td>@Formatting.Day(booking.StartTime), @Formatting.Hour(booking.StartTime)</td>
+                        <td>@booking.Court?.Name</td>
+                        <td>@(booking.Status == BookingStatus.Confirmed ? "Played" : Formatting.Status(booking.Status))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "cancel")]
+    private int? CancelId { get; set; }
+
+    private string userId = "";
+    private List<Booking> upcoming = [];
+    private List<Booking> history = [];
+    private string? statusMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        userId = UserManager.GetUserId((await AuthState).User) ?? "";
+        await LoadAsync();
+    }
+
+    private async Task CancelBooking()
+    {
+        if (CancelId is null)
+        {
+            return;
+        }
+
+        var result = await Bookings.CancelAsync(CancelId.Value, userId);
+        statusMessage = result.Succeeded ? result.Message : "Error: " + result.Message;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var all = await Db.Bookings
+            .AsNoTracking()
+            .Include(b => b.Court).ThenInclude(c => c!.Facility)
+            .Where(b => b.PlayerId == userId)
+            .OrderBy(b => b.StartTime)
+            .ToListAsync();
+
+        var now = Clock.Now;
+        upcoming = all.Where(b => b.Status == BookingStatus.Confirmed && b.StartTime > now).ToList();
+        history = all.Except(upcoming).OrderByDescending(b => b.StartTime).ToList();
+    }
+}

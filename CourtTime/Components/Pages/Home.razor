@@ -1,0 +1,34 @@
+@page "/"
+
+<PageTitle>CourtTime - Book a court</PageTitle>
+
+<section class="hero rounded-4 p-4 p-md-5 mb-4">
+    <h1 class="display-6 fw-bold">Book a court without the back-and-forth</h1>
+    <p class="lead mb-4">
+        CourtTime shows real-time availability for beach tennis, padel and futsal courts,
+        so players reserve a slot themselves and facilities keep one reliable schedule.
+    </p>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-accent btn-lg" href="courts">Find a court</a>
+        <AuthorizeView>
+            <NotAuthorized>
+                <a class="btn btn-outline-light btn-lg" href="Account/Register">Create a free account</a>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+</section>
+
+<section class="row g-4" aria-label="How it works">
+    <div class="col-md-4">
+        <h2 class="h5">1. Find a court</h2>
+        <p>Filter by sport and compare surface, price and opening hours.</p>
+    </div>
+    <div class="col-md-4">
+        <h2 class="h5">2. Pick a free hour</h2>
+        <p>The daily calendar shows which slots are free, taken or reserved by the facility.</p>
+    </div>
+    <div class="col-md-4">
+        <h2 class="h5">3. Play and manage</h2>
+        <p>Reschedule or cancel from My bookings. Facility managers see every booking on one schedule.</p>
+    </div>
+</section>

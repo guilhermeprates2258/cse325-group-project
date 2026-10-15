@@ -1,0 +1,61 @@
+@inherits LayoutComponentBase
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<header>
+    <nav class="navbar navbar-expand-md navbar-dark bg-brand" aria-label="Main navigation">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="">
+                <span class="brand-dot" aria-hidden="true"></span> CourtTime
+            </a>
+            <ul class="navbar-nav flex-row flex-wrap gap-2 gap-md-0 me-auto">
+                <li class="nav-item">
+                    <NavLink class="nav-link px-2" href="courts">Courts</NavLink>
+                </li>
+                <AuthorizeView Roles="@Roles.Player">
+                    <li class="nav-item">
+                        <NavLink class="nav-link px-2" href="bookings">My bookings</NavLink>
+                    </li>
+                </AuthorizeView>
+                <AuthorizeView Roles="@Roles.FacilityManager">
+                    <li class="nav-item">
+                        <NavLink class="nav-link px-2" href="manage/schedule">Schedule</NavLink>
+                    </li>
+                    <li class="nav-item">
+                        <NavLink class="nav-link px-2" href="manage/courts">Manage courts</NavLink>
+                    </li>
+                </AuthorizeView>
+            </ul>
+            <div class="navbar-nav flex-row align-items-center gap-2">
+                <AuthorizeView>
+                    <Authorized>
+                        <NavLink class="nav-link px-2" href="Account/Profile">@context.User.Identity?.Name</NavLink>
+                        <form action="Account/Logout" method="post">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="returnUrl" value="" />
+                            <button type="submit" class="btn btn-sm btn-outline-light">Log out</button>
+                        </form>
+                    </Authorized>
+                    <NotAuthorized>
+                        <NavLink class="nav-link px-2" href="Account/Login">Log in</NavLink>
+                        <a class="btn btn-sm btn-accent" href="Account/Register">Sign up</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </div>
+    </nav>
+</header>
+
+<main id="main-content" class="container py-4">
+    @Body
+</main>
+
+<footer class="border-top py-3 text-center text-body-secondary small">
+    CourtTime &middot; CSE 325 Group Project &middot; BYU-Idaho
+</footer>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>

@@ -1,0 +1,126 @@
+@page "/manage/courts"
+@attribute [Authorize(Roles = Roles.FacilityManager)]
+@inject FacilityService Facilities
+@inject UserManager<ApplicationUser> UserManager
+
+<PageTitle>Manage courts - CourtTime</PageTitle>
+
+<h1>Manage courts</h1>
+<StatusAlert Message="@statusMessage" />
+
+<section class="card mb-4">
+    <div class="card-body">
+        <h2 class="h5">@(facility is null ? "Register your facility" : "Facility details")</h2>
+        @if (facility is null)
+        {
+            <p class="text-body-secondary">Before adding courts, tell players where they will play.</p>
+        }
+        <EditForm Model="FacilityInput" method="post" OnValidSubmit="SaveFacility" FormName="facility">
+            <DataAnnotationsValidator />
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="fname" class="form-label">Facility name</label>
+                    <InputText id="fname" @bind-Value="FacilityInput.Name" class="form-control" aria-required="true" />
+                    <ValidationMessage For="() => FacilityInput.Name" class="text-danger" />
+                </div>
+                <div class="col-md-5">
+                    <label for="faddress" class="form-label">Address</label>
+                    <InputText id="faddress" @bind-Value="FacilityInput.Address" class="form-control" autocomplete="street-address" />
+                    <ValidationMessage For="() => FacilityInput.Address" class="text-danger" />
+                </div>
+                <div class="col-md-3">
+                    <label for="fphone" class="form-label">Contact phone</label>
+                    <InputText id="fphone" type="tel" @bind-Value="FacilityInput.ContactPhone" class="form-control" />
+                    <ValidationMessage For="() => FacilityInput.ContactPhone" class="text-danger" />
+                </div>
+            </div>
+            <button type="submit" class="btn btn-brand mt-3">@(facility is null ? "Register facility" : "Save details")</button>
+        </EditForm>
+    </div>
+</section>
+
+@if (facility is not null)
+{
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h4 mb-0">Courts</h2>
+        <a class="btn btn-brand" href="manage/courts/new">Add court</a>
+    </div>
+
+    @if (facility.Courts.Count == 0)
+    {
+        <p>No courts yet. Add your first court so players can start booking.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <caption class="visually-hidden">Courts of @facility.Name</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Court</th>
+                        <th scope="col">Sport</th>
+                        <th scope="col">Price / hour</th>
+                        <th scope="col">Hours</th>
+                        <th scope="col">Status</th>
+                        <th scope="col"><span class="visually-hidden">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var court in facility.Courts.OrderBy(c => c.Name))
+                    {
+                        <tr>
+                            <td>@court.Name</td>
+                            <td>@Formatting.Sport(court.Sport)</td>
+                            <td>@Formatting.Price(court.HourlyPrice)</td>
+                            <td>@court.OpensAt.ToString("HH:mm") - @court.ClosesAt.ToString("HH:mm")</td>
+                            <td>
+                                <span class="badge @(court.IsActive ? "text-bg-success" : "text-bg-secondary")">
+                                    @(court.IsActive ? "Active" : "Inactive")
+                                </span>
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-outline-brand" href="courts/@court.Id">View</a>
+                                <a class="btn btn-sm btn-outline-brand" href="manage/courts/@court.Id/edit">
+                                    Edit<span class="visually-hidden">@($" {court.Name}")</span>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "facility")]
+    private Facility FacilityInput { get; set; } = default!;
+
+    [SupplyParameterFromQuery(Name = "status")]
+    private string? Status { get; set; }
+
+    private string managerId = "";
+    private Facility? facility;
+    private string? statusMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        statusMessage = Status;
+        managerId = UserManager.GetUserId((await AuthState).User) ?? "";
+        facility = await Facilities.GetFacilityAsync(managerId);
+
+        FacilityInput ??= facility is null
+            ? new Facility()
+            : new Facility { Name = facility.Name, Address = facility.Address, ContactPhone = facility.ContactPhone };
+    }
+
+    private async Task SaveFacility()
+    {
+        await Facilities.SaveFacilityAsync(managerId, FacilityInput);
+        facility = await Facilities.GetFacilityAsync(managerId);
+        statusMessage = "Facility details saved.";
+    }
+}

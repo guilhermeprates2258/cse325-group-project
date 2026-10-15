@@ -1,0 +1,129 @@
+@page "/Account/Register"
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager Navigation
+
+<PageTitle>Create account - CourtTime</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <h1>Create your account</h1>
+        <StatusAlert Message="@errorMessage" />
+
+        <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert" />
+
+            <fieldset class="mb-3">
+                <legend class="form-label fs-6">I want to</legend>
+                <InputRadioGroup @bind-Value="Input.Role">
+                    <div class="form-check">
+                        <InputRadio id="role-player" Value="@Roles.Player" class="form-check-input" />
+                        <label for="role-player" class="form-check-label">Book courts (Player)</label>
+                    </div>
+                    <div class="form-check">
+                        <InputRadio id="role-manager" Value="@Roles.FacilityManager" class="form-check-input" />
+                        <label for="role-manager" class="form-check-label">Manage my facility's courts (Facility manager)</label>
+                    </div>
+                </InputRadioGroup>
+            </fieldset>
+
+            <div class="mb-3">
+                <label for="fullname" class="form-label">Full name</label>
+                <InputText id="fullname" @bind-Value="Input.FullName" class="form-control" autocomplete="name" aria-required="true" />
+                <ValidationMessage For="() => Input.FullName" class="text-danger" />
+            </div>
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <InputText id="email" type="email" @bind-Value="Input.Email" class="form-control" autocomplete="username" aria-required="true" />
+                <ValidationMessage For="() => Input.Email" class="text-danger" />
+            </div>
+            <div class="mb-3">
+                <label for="phone" class="form-label">Phone (optional)</label>
+                <InputText id="phone" type="tel" @bind-Value="Input.Phone" class="form-control" autocomplete="tel" />
+                <ValidationMessage For="() => Input.Phone" class="text-danger" />
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <InputText id="password" type="password" @bind-Value="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" aria-describedby="password-help" />
+                <div id="password-help" class="form-text">At least 8 characters, with upper and lower case letters, a number and a symbol.</div>
+                <ValidationMessage For="() => Input.Password" class="text-danger" />
+            </div>
+            <div class="mb-3">
+                <label for="confirm" class="form-label">Confirm password</label>
+                <InputText id="confirm" type="password" @bind-Value="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" />
+                <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
+            </div>
+            <button type="submit" class="btn btn-brand w-100">Create account</button>
+        </EditForm>
+
+        <p class="mt-3">Already have an account? <a href="Account/Login">Log in</a></p>
+    </div>
+</div>
+
+@code {
+    private string? errorMessage;
+
+    [SupplyParameterFromForm]
+    private RegisterModel Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task RegisterUser()
+    {
+        if (!Roles.All.Contains(Input.Role))
+        {
+            errorMessage = "Error: Please choose an account type.";
+            return;
+        }
+
+        var user = new ApplicationUser
+        {
+            UserName = Input.Email,
+            Email = Input.Email,
+            FullName = Input.FullName.Trim(),
+            PhoneNumber = string.IsNullOrWhiteSpace(Input.Phone) ? null : Input.Phone.Trim()
+        };
+
+        var result = await UserManager.CreateAsync(user, Input.Password);
+        if (!result.Succeeded)
+        {
+            errorMessage = "Error: " + string.Join(" ", result.Errors.Select(e => e.Description));
+            return;
+        }
+
+        await UserManager.AddToRoleAsync(user, Input.Role);
+        await SignInManager.SignInAsync(user, isPersistent: false);
+
+        var destination = Input.Role == Roles.FacilityManager ? "/manage/courts" : Login.SafeReturnUrl(ReturnUrl);
+        Navigation.NavigateTo(destination, forceLoad: true);
+    }
+
+    private sealed class RegisterModel
+    {
+        [Required]
+        public string Role { get; set; } = Roles.Player;
+
+        [Required, StringLength(100)]
+        [Display(Name = "Full name")]
+        public string FullName { get; set; } = "";
+
+        [Required, EmailAddress]
+        public string Email { get; set; } = "";
+
+        [RegularExpression(@"^[0-9+()\-\s]{7,30}$", ErrorMessage = "Enter a valid phone number.")]
+        public string? Phone { get; set; }
+
+        [Required, StringLength(100, MinimumLength = 8)]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare(nameof(Password), ErrorMessage = "The passwords do not match.")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}

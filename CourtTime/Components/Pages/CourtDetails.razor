@@ -1,0 +1,207 @@
+@page "/courts/{Id:int}"
+@inject ApplicationDbContext Db
+@inject BookingService Bookings
+@inject UserManager<ApplicationUser> UserManager
+@inject IClock Clock
+
+<PageTitle>@(court?.Name ?? "Court") - CourtTime</PageTitle>
+
+@if (court is null)
+{
+    <h1>Court not found</h1>
+    <p><a href="courts">Back to all courts</a></p>
+}
+else
+{
+    <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="courts">Courts</a></li>
+            <li class="breadcrumb-item active" aria-current="page">@court.Name</li>
+        </ol>
+    </nav>
+
+    <h1>@court.Name</h1>
+    <p class="text-body-secondary">
+        @court.Facility?.Name &middot; @Formatting.Sport(court.Sport) &middot; @Formatting.Surface(court.Surface)
+        &middot; @Formatting.Price(court.HourlyPrice) / hour
+    </p>
+
+    @if (rescheduling is not null)
+    {
+        <div class="alert alert-info" role="status">
+            You are moving your booking of @Formatting.Day(rescheduling.StartTime) at @Formatting.Hour(rescheduling.StartTime).
+            Choose a new time below. <a href="bookings">Keep the current time</a>
+        </div>
+    }
+
+    <StatusAlert Message="@statusMessage" />
+
+    <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+        <a class="btn btn-outline-secondary @(date <= Clock.Today ? "disabled" : "")"
+           aria-disabled="@(date <= Clock.Today)"
+           href="@DayLink(date.AddDays(-1))">&larr; Previous day</a>
+
+        <form method="get" class="d-flex align-items-end gap-2">
+            @if (Reschedule is not null)
+            {
+                <input type="hidden" name="reschedule" value="@Reschedule" />
+            }
+            <div>
+                <label for="date" class="form-label mb-1">Date</label>
+                <input id="date" type="date" name="date" class="form-control" value="@date.ToString("yyyy-MM-dd")"
+                       min="@Clock.Today.ToString("yyyy-MM-dd")"
+                       max="@Clock.Today.AddDays(BookingService.BookingWindowDays).ToString("yyyy-MM-dd")" />
+            </div>
+            <button type="submit" class="btn btn-brand">Go</button>
+        </form>
+
+        <a class="btn btn-outline-secondary" href="@DayLink(date.AddDays(1))">Next day &rarr;</a>
+    </div>
+
+    <h2 class="h4">@Formatting.Day(date)</h2>
+
+    @if (!court.IsActive)
+    {
+        <p>This court is not taking bookings right now.</p>
+    }
+    else if (slots.Count == 0)
+    {
+        <p>No time slots on this day.</p>
+    }
+    else
+    {
+        <ul class="list-inline legend small mb-2" aria-label="Legend">
+            <li class="list-inline-item"><span class="slot-key free"></span> Free</li>
+            <li class="list-inline-item"><span class="slot-key booked"></span> Booked</li>
+            <li class="list-inline-item"><span class="slot-key blocked"></span> Reserved by facility</li>
+            <li class="list-inline-item"><span class="slot-key mine"></span> Your booking</li>
+        </ul>
+
+        @* One form for the whole grid: each free slot is a submit button carrying its start time. *@
+        <form method="post" @formname="book" @onsubmit="BookSlot">
+            <AntiforgeryToken />
+            <div class="slot-grid">
+                @foreach (var slot in slots)
+                {
+                    var label = $"{Formatting.Hour(slot.Start)} - {Formatting.Hour(slot.End)}";
+                    if (slot.State == SlotState.Free && canBook)
+                    {
+                        <button type="submit" name="BookStart" value="@slot.Start.ToString("O")" class="slot free">
+                            <span class="time">@label</span>
+                            <span class="state">@(rescheduling is null ? "Book" : "Move here")</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="slot @SlotCss(slot)">
+                            <span class="time">@label</span>
+                            <span class="state">@SlotText(slot)</span>
+                        </div>
+                    }
+                }
+            </div>
+        </form>
+
+        @if (!isAuthenticated)
+        {
+            <p class="mt-3"><a href="@($"Account/Login?returnUrl=courts/{Id}")">Log in</a> or <a href="Account/Register">create a player account</a> to book a slot.</p>
+        }
+        else if (!canBook)
+        {
+            <p class="mt-3 text-body-secondary">Only player accounts can book courts.</p>
+        }
+    }
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    [SupplyParameterFromQuery(Name = "date")]
+    private string? DateText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "reschedule")]
+    private int? Reschedule { get; set; }
+
+    [SupplyParameterFromForm(FormName = "book")]
+    private string? BookStart { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    private Court? court;
+    private DateOnly date;
+    private List<TimeSlot> slots = [];
+    private Booking? rescheduling;
+    private string? userId;
+    private bool isAuthenticated;
+    private bool canBook;
+    private string? statusMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthState).User;
+        isAuthenticated = user.Identity?.IsAuthenticated == true;
+        canBook = user.IsInRole(Roles.Player);
+        userId = isAuthenticated ? UserManager.GetUserId(user) : null;
+
+        date = DateOnly.TryParse(DateText, out var parsed) && parsed >= Clock.Today ? parsed : Clock.Today;
+
+        court = await Db.Courts.AsNoTracking().Include(c => c.Facility).FirstOrDefaultAsync(c => c.Id == Id);
+
+        if (Reschedule is not null && userId is not null)
+        {
+            rescheduling = await Db.Bookings.AsNoTracking()
+                .FirstOrDefaultAsync(b => b.Id == Reschedule && b.PlayerId == userId && b.Status == BookingStatus.Confirmed);
+        }
+
+        await LoadSlotsAsync();
+    }
+
+    private async Task BookSlot()
+    {
+        if (court is null || userId is null || !canBook
+            || !DateTime.TryParse(BookStart, null, System.Globalization.DateTimeStyles.RoundtripKind, out var start))
+        {
+            statusMessage = "Error: Please log in with a player account to book.";
+            return;
+        }
+
+        var result = rescheduling is null
+            ? await Bookings.CreateAsync(court.Id, userId, start)
+            : await Bookings.RescheduleAsync(rescheduling.Id, userId, court.Id, start);
+
+        statusMessage = result.Succeeded
+            ? result.Message + " See it in My bookings."
+            : "Error: " + result.Message;
+
+        if (result.Succeeded)
+        {
+            rescheduling = null;
+        }
+
+        await LoadSlotsAsync();
+    }
+
+    private async Task LoadSlotsAsync()
+    {
+        slots = court is null ? [] : await Bookings.GetDaySlotsAsync(court, date, userId);
+    }
+
+    private string DayLink(DateOnly day)
+    {
+        var link = $"courts/{Id}?date={day:yyyy-MM-dd}";
+        return Reschedule is null ? link : $"{link}&reschedule={Reschedule}";
+    }
+
+    private static string SlotCss(TimeSlot slot) => slot.IsMine ? "mine" : slot.State.ToString().ToLowerInvariant();
+
+    private string SlotText(TimeSlot slot) => slot switch
+    {
+        { IsMine: true } => "Your booking",
+        { State: SlotState.Booked } => "Booked",
+        { State: SlotState.Blocked } => "Reserved",
+        { State: SlotState.Past } => "Past",
+        _ => isAuthenticated ? "Free" : "Free - log in to book"
+    };
+}

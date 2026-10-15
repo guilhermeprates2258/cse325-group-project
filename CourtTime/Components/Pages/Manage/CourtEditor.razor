@@ -1,0 +1,155 @@
+@page "/manage/courts/new"
+@page "/manage/courts/{Id:int}/edit"
+@attribute [Authorize(Roles = Roles.FacilityManager)]
+@inject FacilityService Facilities
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsNew ? "Add court" : "Edit court") - CourtTime</PageTitle>
+
+<nav aria-label="Breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="manage/courts">Manage courts</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@(IsNew ? "Add court" : "Edit court")</li>
+    </ol>
+</nav>
+
+<h1>@(IsNew ? "Add court" : $"Edit {loadedName}")</h1>
+<StatusAlert Message="@statusMessage" />
+
+@if (notFound)
+{
+    <p>This court does not exist or does not belong to your facility.</p>
+}
+else
+{
+    <EditForm Model="Input" method="post" OnValidSubmit="SaveCourt" FormName="court">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-danger" role="alert" />
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label for="name" class="form-label">Court name</label>
+                <InputText id="name" @bind-Value="Input.Name" class="form-control" aria-required="true" />
+                <ValidationMessage For="() => Input.Name" class="text-danger" />
+            </div>
+            <div class="col-md-3">
+                <label for="sport" class="form-label">Sport</label>
+                <InputSelect id="sport" @bind-Value="Input.Sport" class="form-select">
+                    @foreach (var sport in Enum.GetValues<SportType>())
+                    {
+                        <option value="@sport">@Formatting.Sport(sport)</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-3">
+                <label for="surface" class="form-label">Surface</label>
+                <InputSelect id="surface" @bind-Value="Input.Surface" class="form-select">
+                    @foreach (var surface in Enum.GetValues<CourtSurface>())
+                    {
+                        <option value="@surface">@Formatting.Surface(surface)</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-4">
+                <label for="price" class="form-label">Price per hour (USD)</label>
+                <InputNumber id="price" @bind-Value="Input.HourlyPrice" class="form-control" step="0.01" min="0" />
+                <ValidationMessage For="() => Input.HourlyPrice" class="text-danger" />
+            </div>
+            <div class="col-md-4">
+                <label for="opens" class="form-label">Opens at</label>
+                <InputDate Type="InputDateType.Time" id="opens" @bind-Value="Input.OpensAt" class="form-control" step="3600" />
+            </div>
+            <div class="col-md-4">
+                <label for="closes" class="form-label">Closes at</label>
+                <InputDate Type="InputDateType.Time" id="closes" @bind-Value="Input.ClosesAt" class="form-control" step="3600" />
+                <ValidationMessage For="() => Input.ClosesAt" class="text-danger" />
+            </div>
+            <div class="col-12">
+                <div class="form-check">
+                    <InputCheckbox id="active" @bind-Value="Input.IsActive" class="form-check-input" />
+                    <label for="active" class="form-check-label">Active (players can book this court)</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-4">
+            <button type="submit" class="btn btn-brand">@(IsNew ? "Add court" : "Save changes")</button>
+            <a class="btn btn-outline-secondary" href="manage/courts">Back</a>
+        </div>
+    </EditForm>
+
+    @if (!IsNew)
+    {
+        <form method="post" @formname="delete" @onsubmit="DeleteCourt" class="mt-4 border-top pt-3">
+            <AntiforgeryToken />
+            <p class="small text-body-secondary mb-2">
+                Courts with booking history are deactivated instead of deleted, so players keep their records.
+            </p>
+            <button type="submit" class="btn btn-outline-danger">Delete court</button>
+        </form>
+    }
+}
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "court")]
+    private Court Input { get; set; } = default!;
+
+    private bool IsNew => Id is null;
+    private string managerId = "";
+    private string loadedName = "";
+    private bool notFound;
+    private string? statusMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        managerId = UserManager.GetUserId((await AuthState).User) ?? "";
+
+        if (IsNew)
+        {
+            Input ??= new Court();
+            return;
+        }
+
+        var court = await Facilities.GetCourtAsync(managerId, Id!.Value);
+        if (court is null)
+        {
+            notFound = true;
+            return;
+        }
+
+        loadedName = court.Name;
+        if (Input is null)
+        {
+            Input = court;
+        }
+        else
+        {
+            Input.Id = court.Id;
+        }
+    }
+
+    private async Task SaveCourt()
+    {
+        if (await Facilities.SaveCourtAsync(managerId, Input))
+        {
+            Navigation.NavigateTo($"manage/courts?status={Uri.EscapeDataString($"{Input.Name} saved.")}");
+        }
+        else
+        {
+            statusMessage = "Error: Register your facility before adding courts.";
+        }
+    }
+
+    private async Task DeleteCourt()
+    {
+        var message = await Facilities.DeleteCourtAsync(managerId, Id!.Value);
+        Navigation.NavigateTo($"manage/courts?status={Uri.EscapeDataString(message)}");
+    }
+}

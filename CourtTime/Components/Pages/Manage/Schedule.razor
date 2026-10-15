@@ -1,0 +1,264 @@
+@page "/manage/schedule"
+@attribute [Authorize(Roles = Roles.FacilityManager)]
+@inject FacilityService Facilities
+@inject UserManager<ApplicationUser> UserManager
+@inject IClock Clock
+
+<PageTitle>Daily schedule - CourtTime</PageTitle>
+
+<h1>Daily schedule</h1>
+<StatusAlert Message="@statusMessage" />
+
+@if (facility is null)
+{
+    <p><a href="manage/courts">Register your facility</a> to start receiving bookings.</p>
+}
+else
+{
+    <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+        <a class="btn btn-outline-secondary" href="@DayLink(date.AddDays(-1))">&larr; Previous day</a>
+        <form method="get" class="d-flex align-items-end gap-2">
+            <div>
+                <label for="date" class="form-label mb-1">Date</label>
+                <input id="date" type="date" name="date" class="form-control" value="@date.ToString("yyyy-MM-dd")" />
+            </div>
+            <button type="submit" class="btn btn-brand">Go</button>
+        </form>
+        <a class="btn btn-outline-secondary" href="@DayLink(date.AddDays(1))">Next day &rarr;</a>
+        <a class="btn btn-link" href="@DayLink(Clock.Today)">Today</a>
+    </div>
+
+    <h2 class="h4">@Formatting.Day(date)</h2>
+
+    <div class="row g-3 mb-3" aria-label="Day summary">
+        <div class="col-6 col-md-3"><div class="stat"><span class="value">@ActiveBookings.Count()</span><span class="label">Bookings</span></div></div>
+        <div class="col-6 col-md-3"><div class="stat"><span class="value">@ActiveBookings.Count(b => b.PaymentStatus == PaymentStatus.Paid)</span><span class="label">Paid</span></div></div>
+        <div class="col-6 col-md-3"><div class="stat"><span class="value">@Formatting.Price(ActiveBookings.Where(b => b.PaymentStatus == PaymentStatus.Paid).Sum(b => b.Court?.HourlyPrice ?? 0))</span><span class="label">Received</span></div></div>
+        <div class="col-6 col-md-3"><div class="stat"><span class="value">@blocks.Count</span><span class="label">Blocked slots</span></div></div>
+    </div>
+
+    @if (bookings.Count == 0)
+    {
+        <p>No bookings on this day.</p>
+    }
+    else
+    {
+        <form method="post" @formname="booking-action" @onsubmit="UpdateBooking">
+            <AntiforgeryToken />
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <caption class="visually-hidden">Bookings on @Formatting.Day(date)</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Time</th>
+                            <th scope="col">Court</th>
+                            <th scope="col">Player</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Payment</th>
+                            <th scope="col"><span class="visually-hidden">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var booking in bookings)
+                        {
+                            var who = booking.Player?.FullName ?? booking.Player?.Email;
+                            <tr class="@(booking.Status == BookingStatus.Cancelled ? "text-body-secondary" : "")">
+                                <td>@Formatting.Hour(booking.StartTime) - @Formatting.Hour(booking.EndTime)</td>
+                                <td>@booking.Court?.Name</td>
+                                <td>
+                                    @who
+                                    @if (!string.IsNullOrEmpty(booking.Player?.PhoneNumber))
+                                    {
+                                        <br /><a class="small" href="tel:@booking.Player.PhoneNumber">@booking.Player.PhoneNumber</a>
+                                    }
+                                </td>
+                                <td>@Formatting.Status(booking.Status)</td>
+                                <td>
+                                    <span class="badge @(booking.PaymentStatus == PaymentStatus.Paid ? "text-bg-success" : "text-bg-warning")">
+                                        @(booking.PaymentStatus == PaymentStatus.Paid ? "Paid" : "Pending")
+                                    </span>
+                                </td>
+                                <td class="text-end text-nowrap">
+                                    @if (booking.Status != BookingStatus.Cancelled)
+                                    {
+                                        @if (booking.PaymentStatus == PaymentStatus.Paid)
+                                        {
+                                            <button type="submit" name="BookingAction" value="@($"unpaid:{booking.Id}")" class="btn btn-sm btn-outline-secondary">Undo paid<span class="visually-hidden">@($" for {who}")</span></button>
+                                        }
+                                        else
+                                        {
+                                            <button type="submit" name="BookingAction" value="@($"paid:{booking.Id}")" class="btn btn-sm btn-success">Mark paid<span class="visually-hidden">@($" for {who}")</span></button>
+                                        }
+                                        @if (booking.Status == BookingStatus.Confirmed)
+                                        {
+                                            <button type="submit" name="BookingAction" value="@($"completed:{booking.Id}")" class="btn btn-sm btn-outline-brand">Completed<span class="visually-hidden">@($" for {who}")</span></button>
+                                            <button type="submit" name="BookingAction" value="@($"noshow:{booking.Id}")" class="btn btn-sm btn-outline-danger">No-show<span class="visually-hidden">@($" for {who}")</span></button>
+                                        }
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </form>
+    }
+
+    <section class="mt-5">
+        <h2 class="h4">Blocked slots</h2>
+        <p class="text-body-secondary">Reserve time for classes, maintenance or events. Players cannot book blocked times.</p>
+
+        @if (blocks.Count > 0)
+        {
+            <form method="post" @formname="remove-block" @onsubmit="RemoveBlock">
+                <AntiforgeryToken />
+                <ul class="list-group mb-3">
+                    @foreach (var block in blocks)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                <strong>@block.Court?.Name</strong>, @Formatting.Hour(block.StartTime) - @Formatting.Hour(block.EndTime)
+                                &middot; @block.Reason @(string.IsNullOrEmpty(block.Notes) ? "" : $"({block.Notes})")
+                            </span>
+                            <button type="submit" name="RemoveBlockId" value="@block.Id" class="btn btn-sm btn-outline-danger">
+                                Remove<span class="visually-hidden">@($" block on {block.Court?.Name} at {Formatting.Hour(block.StartTime)}")</span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+            </form>
+        }
+
+        <EditForm Model="BlockInput" method="post" OnValidSubmit="AddBlock" FormName="add-block" class="card card-body">
+            <DataAnnotationsValidator />
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label for="bcourt" class="form-label">Court</label>
+                    <InputSelect id="bcourt" @bind-Value="BlockInput.CourtId" class="form-select">
+                        @foreach (var court in facility.Courts.OrderBy(c => c.Name))
+                        {
+                            <option value="@court.Id">@court.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label for="bstart" class="form-label">From</label>
+                    <InputDate Type="InputDateType.Time" id="bstart" @bind-Value="BlockInput.From" class="form-control" step="3600" />
+                </div>
+                <div class="col-6 col-md-2">
+                    <label for="bend" class="form-label">To</label>
+                    <InputDate Type="InputDateType.Time" id="bend" @bind-Value="BlockInput.To" class="form-control" step="3600" />
+                </div>
+                <div class="col-md-2">
+                    <label for="breason" class="form-label">Reason</label>
+                    <InputSelect id="breason" @bind-Value="BlockInput.Reason" class="form-select">
+                        @foreach (var reason in Enum.GetValues<BlockReason>())
+                        {
+                            <option value="@reason">@reason</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label for="bnotes" class="form-label">Notes (optional)</label>
+                    <InputText id="bnotes" @bind-Value="BlockInput.Notes" class="form-control" />
+                </div>
+            </div>
+            <button type="submit" class="btn btn-brand mt-3 align-self-start">Block time on @Formatting.Day(date)</button>
+        </EditForm>
+    </section>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [SupplyParameterFromQuery(Name = "date")]
+    private string? DateText { get; set; }
+
+    [SupplyParameterFromForm(FormName = "booking-action")]
+    private string? BookingAction { get; set; }
+
+    [SupplyParameterFromForm(FormName = "remove-block")]
+    private int? RemoveBlockId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "add-block")]
+    private BlockModel BlockInput { get; set; } = default!;
+
+    private string managerId = "";
+    private Facility? facility;
+    private DateOnly date;
+    private List<Booking> bookings = [];
+    private List<BlockedSlot> blocks = [];
+    private string? statusMessage;
+
+    private IEnumerable<Booking> ActiveBookings => bookings.Where(b => b.Status != BookingStatus.Cancelled);
+
+    protected override async Task OnInitializedAsync()
+    {
+        managerId = UserManager.GetUserId((await AuthState).User) ?? "";
+        facility = await Facilities.GetFacilityAsync(managerId);
+        date = DateOnly.TryParse(DateText, out var parsed) ? parsed : Clock.Today;
+        BlockInput ??= new BlockModel { CourtId = facility?.Courts.OrderBy(c => c.Name).FirstOrDefault()?.Id ?? 0 };
+        await LoadAsync();
+    }
+
+    private async Task UpdateBooking()
+    {
+        var parts = BookingAction?.Split(':');
+        if (parts is { Length: 2 } && int.TryParse(parts[1], out var bookingId))
+        {
+            statusMessage = await Facilities.UpdateBookingAsync(managerId, bookingId, parts[0]);
+            await LoadAsync();
+        }
+    }
+
+    private async Task RemoveBlock()
+    {
+        if (RemoveBlockId is not null)
+        {
+            statusMessage = await Facilities.RemoveBlockAsync(managerId, RemoveBlockId.Value);
+            await LoadAsync();
+        }
+    }
+
+    private async Task AddBlock()
+    {
+        statusMessage = await Facilities.BlockSlotAsync(managerId, new BlockedSlot
+        {
+            CourtId = BlockInput.CourtId,
+            StartTime = date.ToDateTime(BlockInput.From),
+            EndTime = date.ToDateTime(BlockInput.To),
+            Reason = BlockInput.Reason,
+            Notes = BlockInput.Notes
+        });
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (facility is null)
+        {
+            return;
+        }
+
+        bookings = await Facilities.GetScheduleAsync(managerId, date);
+        blocks = await Facilities.GetBlockedSlotsAsync(managerId, date);
+    }
+
+    private static string DayLink(DateOnly day) => $"manage/schedule?date={day:yyyy-MM-dd}";
+
+    private sealed class BlockModel
+    {
+        [Range(1, int.MaxValue, ErrorMessage = "Choose a court.")]
+        public int CourtId { get; set; }
+
+        public TimeOnly From { get; set; } = new(12, 0);
+
+        public TimeOnly To { get; set; } = new(13, 0);
+
+        public BlockReason Reason { get; set; } = BlockReason.Class;
+
+        [StringLength(200)]
+        public string? Notes { get; set; }
+    }
+}
